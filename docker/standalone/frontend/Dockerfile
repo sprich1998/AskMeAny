@@ -2,6 +2,9 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+COPY packages/shared/package.json packages/shared/package-lock.json ./packages/shared/
+RUN npm ci --prefix /app/packages/shared
+
 COPY packages/shared ./packages/shared
 COPY apps/frontend/package.json apps/frontend/package-lock.json ./apps/frontend/
 

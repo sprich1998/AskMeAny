@@ -17,8 +17,8 @@ COPY --from=builder /app/apps/backend/package.json /app/apps/backend/package.jso
 COPY --from=builder /app/apps/backend/package-lock.json /app/apps/backend/package-lock.json
 COPY --from=builder /app/apps/backend/node_modules /app/apps/backend/node_modules
 COPY --from=builder /app/apps/backend/dist /app/apps/backend/dist
-COPY infra/postgres/migrations /app/apps/backend/dist/infra/postgres/migrations
+COPY infra/postgres/migrations /app/infra/postgres/migrations
 
 WORKDIR /app/apps/backend
 EXPOSE 4000
-CMD ["node", "dist/apps/backend/src/index.js"]
+CMD ["node", "dist/index.js"]

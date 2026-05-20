@@ -14,11 +14,17 @@ RUN npm run build
 
 FROM mcr.microsoft.com/playwright:v1.52.0-jammy AS runner
 
+ENV DEBIAN_FRONTEND=noninteractive \
+    TZ=Etc/UTC
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    tzdata \
     xvfb \
     x11vnc \
     novnc \
     websockify \
+  && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
+  && echo $TZ > /etc/timezone \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

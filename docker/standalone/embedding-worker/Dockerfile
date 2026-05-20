@@ -23,4 +23,4 @@ COPY --from=builder /app/apps/embedding-worker/node_modules /app/apps/embedding-
 COPY --from=builder /app/apps/embedding-worker/dist /app/apps/embedding-worker/dist
 
 WORKDIR /app/apps/embedding-worker
-CMD ["node", "dist/apps/embedding-worker/src/index.js"]
+CMD ["node", "dist/index.js"]

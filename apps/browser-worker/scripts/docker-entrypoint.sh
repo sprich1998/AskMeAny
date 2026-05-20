@@ -10,4 +10,4 @@ if [ "${ENABLE_VNC:-true}" = "true" ]; then
   websockify --web /usr/share/novnc 6080 localhost:5900 &
 fi
 
-exec node dist/apps/browser-worker/src/index.js
+exec node dist/index.js
