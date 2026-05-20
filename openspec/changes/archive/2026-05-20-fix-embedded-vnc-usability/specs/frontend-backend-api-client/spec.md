@@ -1,15 +1,15 @@
 ## MODIFIED Requirements
 
 ### Requirement: Session API methods
-`apiClient` SHALL implement session lifecycle methods against the backend session and recording routes. Request and response bodies MUST be validated with `@teachmeany/shared` Zod schemas at the gap layer boundary. The session response schema MUST include optional nullable `vncUrl` so the field is preserved through validation and mapped to `BrowserSession.vnc_url`.
+`apiClient` SHALL implement session lifecycle methods against the backend session and recording routes. Request and response bodies MUST be validated with `@teachmeany/shared` Zod schemas at the gap layer boundary where a response body is returned. The session response schema MUST include optional nullable `vncUrl` (ws:// or wss:// URL) preserved through validation and mapped to `BrowserSession.vnc_url`.
 
 | Method | HTTP |
 |--------|------|
 | `createSession(startUrl)` | `POST /sessions` body `{ startUrl }` |
 | `getSessions()` | `GET /sessions` |
 | `getSession(id)` | `GET /sessions/:id` |
-| `startRecording(sessionId)` | `POST /sessions/:id/recording/start` |
-| `stopRecording(sessionId)` | `POST /sessions/:id/recording/stop` |
+| `startRecording(sessionId)` | `POST /sessions/:id/recording/start` (no body) |
+| `stopRecording(sessionId)` | `POST /sessions/:id/recording/stop` (no body) |
 
 #### Scenario: createSession returns real session
 - **WHEN** `apiClient.createSession("https://example.com")` is called against a running backend

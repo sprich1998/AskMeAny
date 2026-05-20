@@ -18,7 +18,7 @@ The frontend SHALL read backend base URL from `NEXT_PUBLIC_API_URL` (default `ht
 ---
 
 ### Requirement: Session API methods
-`apiClient` SHALL implement session lifecycle methods against the backend session and recording routes. Request and response bodies MUST be validated with `@teachmeany/shared` Zod schemas at the gap layer boundary where a response body is returned.
+`apiClient` SHALL implement session lifecycle methods against the backend session and recording routes. Request and response bodies MUST be validated with `@teachmeany/shared` Zod schemas at the gap layer boundary where a response body is returned. The session response schema MUST include optional nullable `vncUrl` (ws:// or wss:// URL) preserved through validation and mapped to `BrowserSession.vnc_url`.
 
 | Method | HTTP |
 |--------|------|
@@ -35,6 +35,10 @@ The frontend SHALL read backend base URL from `NEXT_PUBLIC_API_URL` (default `ht
 #### Scenario: getSessions returns session list
 - **WHEN** `apiClient.getSessions()` is called
 - **THEN** it sends `GET /sessions`, validates `{ sessions, total }` with `ListSessionsResponseSchema`, and returns mapped `BrowserSession[]`
+
+#### Scenario: getSession preserves vncUrl
+- **WHEN** `apiClient.getSession(id)` is called and the backend returns `{ ..., "vncUrl": "ws://localhost:6080", "status": "active" }`
+- **THEN** the client validates with `SessionResponseSchema`, maps to `BrowserSession`, and `vnc_url` equals `"ws://localhost:6080"`
 
 #### Scenario: startRecording requires active session
 - **WHEN** `apiClient.startRecording(sessionId)` is called and backend returns HTTP 409 with code `INVALID_STATE`
