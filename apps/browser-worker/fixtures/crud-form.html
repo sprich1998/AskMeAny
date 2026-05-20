@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>TeachMeAny CRUD Fixture</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 2rem;
+        max-width: 42rem;
+      }
+
+      form {
+        display: grid;
+        gap: 0.75rem;
+      }
+
+      input,
+      button {
+        font: inherit;
+        padding: 0.5rem;
+      }
+
+      pre {
+        background: #f4f4f4;
+        padding: 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Client Search</h1>
+    <form id="client-form">
+      <label>
+        Client ID
+        <input name="clientId" value="12345" />
+      </label>
+      <button type="submit" data-testid="search-client">Search</button>
+    </form>
+    <pre id="result">No result yet</pre>
+
+    <script>
+      const form = document.querySelector("#client-form");
+      const result = document.querySelector("#result");
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const clientId = new FormData(form).get("clientId");
+
+        try {
+          await fetch("https://httpbin.org/post", {
+            method: "POST",
+            headers: {
+              "content-type": "application/json"
+            },
+            body: JSON.stringify({ clientId })
+          });
+        } finally {
+          result.textContent = JSON.stringify(
+            {
+              clientName: "John Smith",
+              status: "active",
+              clientId
+            },
+            null,
+            2
+          );
+        }
+      });
+    </script>
+  </body>
+</html>

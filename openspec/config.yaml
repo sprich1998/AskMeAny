@@ -1,0 +1,249 @@
+schema: spec-driven
+
+context: |
+  ## Product
+
+  TeachMeAny is a browser interaction recorder and API-equivalent workflow extractor.
+  A human uses a website once; the system learns the DOM action → network call relationship
+  well enough to replay it or suggest the direct API operation.
+
+  Core loop:
+    Teach once through UI → Replay through UI or API
+
+  What it is:
+    - Browser interaction recorder
+    - System-intent extractor
+    - Action-to-API memory layer
+
+  What it is NOT:
+    - An AI browser agent
+    - A visual AI / screenshot-first system
+    - A full automation platform
+
+  Target environments: CRUD web apps — admin panels, internal tools, CRM screens,
+  claim systems, booking systems, customer search pages, dashboard apps.
+  Avoid: canvas-heavy SPAs, heavily obfuscated apps, real-time game/map UIs.
+
+  ---
+
+  ## Repository structure
+
+  Monorepo layout:
+
+    apps/             — one Docker image per folder
+      frontend/       — Next.js UI
+      backend/        — Fastify API
+      browser-worker/ — Playwright + CDP + capture engine
+      embedding-worker/ — BullMQ → embeddings → Qdrant
+
+    packages/
+      shared/         — shared TypeScript types, Zod schemas, constants
+                        (imported as @teachmeany/shared; no Node-only or browser-only APIs)
+
+    docker/
+      standalone/     — one Dockerfile per service (run services independently)
+      compose/stack/  — docker-compose.yml for running the full stack
+
+    infra/
+      postgres/       — SQL migrations (versioned, numbered) + first-boot init scripts
+      volumes/        — Docker named volume documentation
+
+    scripts/          — dev/ops shell helpers (POSIX-compatible, callable from repo root)
+
+  Rule: each app in apps/ maps 1:1 to a container. Never conflate services into a single image.
+
+  ---
+
+  ## Tech stack
+
+  Frontend:
+    - Next.js (App Router), React, TypeScript
+    - Browser view: noVNC (WebSocket stream of remote Chromium)
+    - Realtime: WebSocket (subscribe per session_id)
+
+  Backend API:
+    - Node.js + Fastify
+    - WebSocket gateway for frontend timeline updates
+    - Session management, recording control, workflow exposure, replay orchestration
+    - Produces BullMQ jobs for embedding-worker
+
+  Browser worker (heart of the product):
+    - Playwright controlling headless Chromium
+    - Chrome DevTools Protocol (CDP) for network interception and DOM snapshots
+    - Capture engine: action → network correlation, DOM before/after diff, intent naming
+    - Streams display to noVNC
+
+  Embedding worker:
+    - BullMQ consumer (Redis-backed queue)
+    - Embedding model: local sentence-transformers or Ollama (swappable — treat as a port)
+    - Upserts vectors into Qdrant collection: interaction_memory
+
+  Databases:
+    - PostgreSQL 16 — source of truth for all structured data
+    - Qdrant         — similarity/semantic search only; never source of truth
+    - Redis 7        — BullMQ queue + session cache
+
+  Infra:
+    - Docker Compose (development and local production)
+    - browser-worker requires shm_size: 2gb for Chromium
+
+  Language: TypeScript everywhere (frontend, backend, workers).
+  Shared types live in packages/shared — keep them isomorphic.
+
+  ---
+
+  ## Data architecture
+
+  Primary principle: Postgres is truth. Qdrant is memory search. Redis is transport.
+
+  PostgreSQL schema (core tables):
+    browser_sessions   — session lifecycle, start/current URL, status
+    page_snapshots     — URL, title, DOM hash, simplified DOM JSONB
+    actions            — click/input events with selector, xpath, element JSONB
+    network_events     — request + response JSONB, correlated action_id (nullable)
+    dom_mutations      — before/after hash, mutation summary JSONB
+    intents            — name, description, confidence (float), source
+    workflows          — named sequence of steps per session
+    workflow_steps     — action_id, order_index, step_type, api_equivalent JSONB
+
+  All primary keys: UUID. Timestamps: timestamptz. Flexible data: JSONB columns.
+  Migrations: numbered SQL files in infra/postgres/migrations/.
+
+  Qdrant collection:
+    interaction_memory
+      vectors: size depends on embedding model (treat as configurable)
+      payload: action_id, session_id, url, action_type, label,
+               request_method, request_url, inferred_intent
+
+  The core captured chain per action:
+    User Action → DOM Target → Page Context → Network Request
+    → Network Response → DOM Mutation → Inferred Intent
+
+  Core workflow artifact shape (always produce both paths):
+    {
+      "ui_replay": [ { type, selector, value? } ],
+      "api_equivalent": { method, url, body }
+    }
+
+  ---
+
+  ## Domain concepts and terminology
+
+  action         — a single user interaction (click, fill, select, etc.) with full DOM context
+  network_event  — HTTP request/response pair captured during a session
+  correlation    — linking an action to the network_event it caused
+  intent         — semantic label derived from action + network pair (e.g. "search_client")
+  confidence     — float 0–1 representing certainty of an inferred intent
+  workflow       — an ordered sequence of correlated steps that achieves a user goal
+  workflow_step  — one action within a workflow, optionally annotated with api_equivalent
+  session        — a browser lifecycle: from URL open to recording stop
+  ui_replay      — replaying a workflow by driving the browser via Playwright
+  api_equivalent — executing the same intent by calling the API directly (the "fast path")
+  embedding      — vector representation of an interaction, used for similarity search
+  page_snapshot  — DOM state captured at a point in time (hash + simplified structure)
+
+  ---
+
+  ## Coding conventions
+
+  General:
+    - TypeScript strict mode in all apps and packages
+    - No `any` — use `unknown` and narrow, or define proper types in packages/shared
+    - Zod for all runtime validation (API bodies, job payloads, DB JSONB shapes)
+    - Prefer explicit return types on public functions and service methods
+    - No magic strings — use constants from packages/shared/src/constants
+
+  Naming:
+    - Files: kebab-case (e.g. session-service.ts, capture-engine.ts)
+    - Classes: PascalCase; functions and variables: camelCase
+    - DB columns: snake_case (mirrors PostgreSQL convention)
+    - API routes: kebab-case paths, e.g. /browser-sessions/:id/recording
+    - BullMQ queue names: kebab-case, defined in shared constants (e.g. "embed-interaction")
+    - Qdrant collections: snake_case (e.g. interaction_memory)
+    - Docker service names: kebab-case matching apps/ folder names
+
+  API design:
+    - REST for CRUD operations; WebSocket for realtime push (timeline events)
+    - Fastify schemas for request/response validation (can share Zod → JSON Schema)
+    - Return structured errors: { error: string, code: string, details?: unknown }
+    - Session-scoped resources: always include session_id in payloads and routes
+
+  Database:
+    - Never raw SQL strings in application code — use a query builder or typed client
+    - Migrations are append-only; never edit an applied migration
+    - JSONB columns are flexible but always document expected shape in Zod schema
+    - All foreign keys enforced at DB level
+
+  Workers:
+    - BullMQ jobs must be idempotent — safe to retry
+    - Always define job payload type in packages/shared/src/types
+    - Log job ID, session_id, and action_id on every job start and completion
+    - Dead-letter handling: move failed jobs to a separate queue after N retries
+
+  Error handling:
+    - Capture engine errors must never crash the browser-worker process
+    - Correlation failures: store the action uncorrelated, flag for review
+    - Embedding failures: log and re-queue; do not block the capture pipeline
+
+  ---
+
+  ## Architecture decisions (stable across versions)
+
+  1. Separation of capture and intelligence
+     Capture (browser-worker) is always synchronous and fast.
+     Intelligence (intent extraction, embedding) is always async via queue.
+     Never block recording on AI operations.
+
+  2. Dual-path output
+     Every workflow produces both ui_replay steps and api_equivalent.
+     This is the core value proposition — maintain it in every version.
+
+  3. Embedding model is a port
+     The embedding implementation is swappable. Define an EmbeddingClient interface;
+     implementations live in embedding-worker/src/embeddings/.
+     Do not couple the queue job schema to a specific model.
+
+  4. Qdrant is read-augmentation only
+     Never write canonical data to Qdrant first. Write to Postgres, then enqueue embed.
+     Qdrant can be rebuilt from Postgres at any time.
+
+  5. One container = one concern
+     frontend, backend, browser-worker, embedding-worker are never merged into one image.
+     Infra services (postgres, redis, qdrant) are always stock images with volume mounts.
+
+  6. Selectors are stored, not re-computed
+     CSS selector and XPath are captured and stored per action.
+     Replay uses stored selectors. Selector stability is a product-level concern.
+
+  ---
+
+  ## Future extension points (design for these, do not build yet)
+
+  - Multi-session / multi-user: session ownership and scoping is already in schema
+  - Cloud storage: file_storage is intentionally minimal; add S3/GCS adapter later
+  - LLM-powered intent extraction: intent.source field distinguishes rule-based vs LLM
+  - Browser extension alternative to noVNC: capture engine is decoupled from transport
+  - Workflow versioning: workflow_steps schema can gain a version_id FK
+  - API key / OAuth auth: local auth in early versions; auth layer sits in backend routes only
+  - Collaborative sessions: session model can gain owner_id and participant arrays
+  - Webhook / export integrations: workflow artifact JSON is already the export format
+
+rules:
+  proposal:
+    - Always include a "Non-goals" or "What this is NOT" section
+    - State the single measurable success metric upfront
+    - Include a data flow diagram if the change touches the capture → storage → embed pipeline
+    - Reference domain terms from the context glossary; do not invent synonyms
+
+  tasks:
+    - Break into chunks of at most 2–3 hours each
+    - Each task must name the app or package it lives in (e.g. apps/backend, packages/shared)
+    - Tasks that touch the DB must include a migration step
+    - Tasks that touch shared types must list which apps will be affected
+    - If a task changes the workflow artifact shape, flag it explicitly
+
+  spec:
+    - Define inputs, outputs, and error cases for every interface
+    - For any new service method, include the Zod schema or TypeScript signature
+    - Capture engine changes must specify the correlation rule being added or modified
+    - Qdrant changes must specify collection name, vector size, and payload fields

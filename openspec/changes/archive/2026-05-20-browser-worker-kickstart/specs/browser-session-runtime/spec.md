@@ -1,0 +1,19 @@
+## ADDED Requirements
+
+### Requirement: Consume browser launch jobs
+The browser-worker SHALL consume BullMQ jobs from the `browser-launch` queue with `{ sessionId, startUrl }`, launch a Chromium page, navigate to `startUrl`, and register the page in an in-memory session manager.
+
+#### Scenario: Launch job starts a browser session
+- **WHEN** the worker receives a valid launch job
+- **THEN** it launches Chromium, creates a page for the session, navigates to the URL, and patches the backend session to `active`
+
+#### Scenario: Launch failure marks session as error
+- **WHEN** Chromium launch or navigation fails
+- **THEN** the worker patches the backend session to `error` and the job fails for retry
+
+### Requirement: Mirror session lifecycle
+The browser-worker SHALL periodically retrieve session state from the backend and close browser resources when a session enters `stopped` or `error`.
+
+#### Scenario: Stopped session closes browser resources
+- **WHEN** `GET /sessions/:id` returns `status: "stopped"`
+- **THEN** the worker closes the Playwright context and removes the session from memory

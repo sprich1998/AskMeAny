@@ -1,0 +1,9 @@
+CREATE TABLE IF NOT EXISTS intents (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  action_id UUID NOT NULL REFERENCES actions(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL,
+  confidence DOUBLE PRECISION NOT NULL,
+  source TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
