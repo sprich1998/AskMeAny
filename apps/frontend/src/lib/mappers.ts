@@ -24,7 +24,7 @@ export function mapSession(session: SessionResponse): BrowserSession {
     current_url: session.currentUrl,
     status: session.status,
     created_at: session.createdAt,
-    vnc_url: session.vncUrl,
+    vnc_url: session.vncUrl ?? null,
   };
 }
 

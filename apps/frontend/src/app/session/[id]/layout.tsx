@@ -30,8 +30,10 @@ export default function SessionLayout({
       .finally(() => setLoading(false));
   }, [id]);
 
+  const shouldPollSession = session?.status === "created";
+
   useEffect(() => {
-    if (session?.status !== "created" && session?.vnc_url) {
+    if (!shouldPollSession) {
       return;
     }
 
@@ -43,7 +45,7 @@ export default function SessionLayout({
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [id, session?.status, session?.vnc_url]);
+  }, [id, shouldPollSession]);
 
   if (loading) {
     return (

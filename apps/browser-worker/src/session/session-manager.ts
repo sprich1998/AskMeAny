@@ -44,7 +44,10 @@ export class SessionManager {
     );
   }
 
-  async close(sessionId: string): Promise<void> {
+  async close(
+    sessionId: string,
+    options?: { unexpectedTeardown?: boolean }
+  ): Promise<void> {
     const handle = this.sessions.get(sessionId);
     if (!handle) {
       return;
@@ -56,11 +59,30 @@ export class SessionManager {
 
     this.sessions.delete(sessionId);
     await handle.browser.close();
-    await updateSessionRuntime(sessionId, { vncUrl: null }).catch(() => undefined);
+
+    const runtimePatch = options?.unexpectedTeardown
+      ? { status: "error" as const, vncUrl: null }
+      : { vncUrl: null };
+
+    await updateSessionRuntime(sessionId, runtimePatch).catch((error: unknown) => {
+      console.error("Failed to patch session runtime on teardown", {
+        sessionId,
+        unexpectedTeardown: options?.unexpectedTeardown ?? false,
+        error,
+      });
+    });
+
+    if (options?.unexpectedTeardown) {
+      console.info("Marked session error after unexpected browser teardown", { sessionId });
+    }
   }
 
   async closeAll(): Promise<void> {
-    await Promise.all([...this.sessions.keys()].map((sessionId) => this.close(sessionId)));
+    await Promise.all(
+      [...this.sessions.keys()].map((sessionId) =>
+        this.close(sessionId, { unexpectedTeardown: true })
+      )
+    );
   }
 }
 

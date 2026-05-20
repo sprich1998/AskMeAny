@@ -14,7 +14,18 @@ export const SessionResponseSchema = z.object({
   currentUrl: z.string().url(),
   status: SessionStatusSchema,
   createdAt: z.string().datetime(),
-  vncUrl: z.string().url().nullable()
+  vncUrl: z
+    .string()
+    .refine((value) => {
+      try {
+        const parsed = new URL(value);
+        return parsed.protocol === "ws:" || parsed.protocol === "wss:";
+      } catch {
+        return false;
+      }
+    }, "vncUrl must be a ws:// or wss:// URL")
+    .nullable()
+    .optional()
 });
 
 export const ListSessionsResponseSchema = z.object({
@@ -25,7 +36,18 @@ export const ListSessionsResponseSchema = z.object({
 export const UpdateSessionRuntimeBodySchema = z.object({
   status: SessionStatusSchema.optional(),
   currentUrl: z.string().url().optional(),
-  vncUrl: z.string().url().nullable().optional()
+  vncUrl: z
+    .string()
+    .refine((value) => {
+      try {
+        const parsed = new URL(value);
+        return parsed.protocol === "ws:" || parsed.protocol === "wss:";
+      } catch {
+        return false;
+      }
+    }, "vncUrl must be a ws:// or wss:// URL")
+    .nullable()
+    .optional()
 });
 
 export type CreateSessionBody = z.infer<typeof CreateSessionBodySchema>;
