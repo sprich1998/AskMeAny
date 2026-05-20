@@ -3,8 +3,8 @@ FROM mcr.microsoft.com/playwright:v1.52.0-jammy AS builder
 WORKDIR /app
 
 COPY packages/shared/package.json packages/shared/package.json
-COPY apps/browser-worker/package.json apps/browser-worker/package.json
-RUN npm install --prefix /app/apps/browser-worker
+COPY apps/browser-worker/package.json apps/browser-worker/package-lock.json ./apps/browser-worker/
+RUN npm ci --prefix /app/apps/browser-worker
 
 COPY packages/shared packages/shared
 COPY apps/browser-worker apps/browser-worker

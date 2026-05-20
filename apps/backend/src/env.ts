@@ -12,7 +12,8 @@ const EnvSchema = z.object({
     .default("true")
     .transform((value) => value === "true"),
   PORT: z.coerce.number().int().positive().default(4000),
-  NODE_ENV: z.enum(["development", "test", "production"]).default("development")
+  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  CORS_ORIGIN: z.string().optional()
 });
 
 export const env = EnvSchema.parse(process.env);

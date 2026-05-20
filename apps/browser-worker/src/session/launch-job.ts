@@ -49,9 +49,10 @@ async function pollSessionState(sessionId: string): Promise<void> {
 }
 
 async function launchSession(payload: BrowserLaunchJobPayload): Promise<void> {
-  const browser = await launchBrowser();
+  let browser: Awaited<ReturnType<typeof launchBrowser>> | null = null;
 
   try {
+    browser = await launchBrowser();
     const context = await browser.newContext();
     const page = await context.newPage();
     const handle: BrowserSessionHandle = {
@@ -98,7 +99,9 @@ async function launchSession(payload: BrowserLaunchJobPayload): Promise<void> {
     }, env.SESSION_POLL_INTERVAL_MS);
   } catch (error) {
     await updateSessionRuntime(payload.sessionId, { status: "error" }).catch(() => undefined);
-    await browser.close();
+    if (browser) {
+      await browser.close();
+    }
     throw error;
   }
 }
@@ -108,7 +111,15 @@ export function createBrowserLaunchWorker(): Worker<BrowserLaunchJobPayload> {
     BROWSER_LAUNCH_QUEUE,
     async (job: Job<BrowserLaunchJobPayload>) => {
       const payload = BrowserLaunchJobPayloadSchema.parse(job.data);
-      await launchSession(payload);
+      try {
+        await launchSession(payload);
+      } catch (error) {
+        console.error("Browser launch job failed", {
+          sessionId: payload.sessionId,
+          error
+        });
+        throw error;
+      }
     },
     {
       connection: redis

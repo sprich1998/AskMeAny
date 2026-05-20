@@ -56,6 +56,7 @@ services:
       EMBEDDING_VECTOR_SIZE: "768"
       WORKFLOW_EXTRACT_ON_STOP: "true"
       MIGRATIONS_DIR: /app/infra/postgres/migrations
+      CORS_ORIGIN: http://localhost:3000
       NODE_ENV: production
     depends_on:
       postgres:
