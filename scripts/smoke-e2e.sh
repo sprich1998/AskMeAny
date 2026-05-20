@@ -32,9 +32,11 @@ if [ "$status" != "active" ]; then
   exit 1
 fi
 
-curl -sf -X POST "$API_URL/sessions/$session_id/recording/start" -H "Content-Type: application/json" >/dev/null
+curl -sf -X POST "$API_URL/sessions/$session_id/recording/start" \
+  -H "Content-Type: application/json" -d '{}' >/dev/null
 sleep 2
-curl -sf -X POST "$API_URL/sessions/$session_id/recording/stop" -H "Content-Type: application/json" >/dev/null
+curl -sf -X POST "$API_URL/sessions/$session_id/recording/stop" \
+  -H "Content-Type: application/json" -d '{}' >/dev/null
 
 workflows=$(curl -sf "$API_URL/sessions/$session_id/workflows")
 total=$(echo "$workflows" | sed -n 's/.*"total":\([0-9]*\).*/\1/p' | head -1)

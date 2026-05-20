@@ -32,12 +32,16 @@ export async function apiFetch<T>(
   init?: RequestInit
 ): Promise<{ data: T; status: number }> {
   const url = `${getApiBaseUrl()}${path}`;
+  const hasBody = init?.body != null && init.body !== "";
+  const headers = new Headers(init?.headers);
+
+  if (hasBody && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
   const response = await fetch(url, {
     ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...init?.headers,
-    },
+    headers,
   });
 
   if (!response.ok) {

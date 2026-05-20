@@ -3,9 +3,7 @@
 ## Purpose
 
 Real HTTP implementation of the frontend `ApiClient` gap layer, calling Fastify REST endpoints with `@teachmeany/shared` Zod validation at the boundary.
-
 ## Requirements
-
 ### Requirement: HTTP configuration
 The frontend SHALL read backend base URL from `NEXT_PUBLIC_API_URL` (default `http://localhost:4000`). When `NEXT_PUBLIC_USE_MOCKS=true`, the api client SHALL delegate to mock implementations and SHALL NOT perform HTTP requests.
 
@@ -20,15 +18,15 @@ The frontend SHALL read backend base URL from `NEXT_PUBLIC_API_URL` (default `ht
 ---
 
 ### Requirement: Session API methods
-`apiClient` SHALL implement session lifecycle methods against the backend session and recording routes. Request and response bodies MUST be validated with `@teachmeany/shared` Zod schemas at the gap layer boundary.
+`apiClient` SHALL implement session lifecycle methods against the backend session and recording routes. Request and response bodies MUST be validated with `@teachmeany/shared` Zod schemas at the gap layer boundary where a response body is returned.
 
 | Method | HTTP |
 |--------|------|
 | `createSession(startUrl)` | `POST /sessions` body `{ startUrl }` |
 | `getSessions()` | `GET /sessions` |
 | `getSession(id)` | `GET /sessions/:id` |
-| `startRecording(sessionId)` | `POST /sessions/:id/recording/start` |
-| `stopRecording(sessionId)` | `POST /sessions/:id/recording/stop` |
+| `startRecording(sessionId)` | `POST /sessions/:id/recording/start` (no body) |
+| `stopRecording(sessionId)` | `POST /sessions/:id/recording/stop` (no body) |
 
 #### Scenario: createSession returns real session
 - **WHEN** `apiClient.createSession("https://example.com")` is called against a running backend
@@ -45,8 +43,6 @@ The frontend SHALL read backend base URL from `NEXT_PUBLIC_API_URL` (default `ht
 #### Scenario: stopRecording returns to active
 - **WHEN** `apiClient.stopRecording(sessionId)` succeeds
 - **THEN** the session status reflected in subsequent `getSession` is `"active"` (not `"idle"`)
-
----
 
 ### Requirement: Workflow and replay API methods
 `apiClient` SHALL implement workflow read and replay trigger methods.
@@ -81,3 +77,19 @@ HTTP responses with status ≥ 400 SHALL be parsed as `{ error: string, code: st
 #### Scenario: Network failure surfaces error
 - **WHEN** the backend is unreachable
 - **THEN** `apiClient` methods reject with a descriptive error (connection failed), not mock data
+
+### Requirement: Bodyless POST requests
+The gap layer SHALL NOT send `Content-Type: application/json` on HTTP POST requests that have no request body. Recording control methods MUST succeed against Fastify without triggering empty JSON body parser errors.
+
+#### Scenario: startRecording on active session
+- **WHEN** `apiClient.startRecording(sessionId)` is called against a running backend and the session `status` is `"active"`
+- **THEN** it sends `POST /sessions/:id/recording/start` without an empty JSON body or without a JSON Content-Type header, and the call resolves without HTTP 400
+
+#### Scenario: stopRecording on recording session
+- **WHEN** `apiClient.stopRecording(sessionId)` is called and the session `status` is `"recording"`
+- **THEN** it sends `POST /sessions/:id/recording/stop` without an empty JSON body or without a JSON Content-Type header, and the call resolves without HTTP 400
+
+#### Scenario: Fastify empty body error is not returned
+- **WHEN** `apiClient.startRecording(sessionId)` is called on an active session
+- **THEN** the backend MUST NOT respond with `FST_ERR_CTP_EMPTY_JSON_BODY`
+
